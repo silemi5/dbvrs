@@ -12,6 +12,9 @@ import shutil
 today = datetime.now().strftime("%Y-%m-%d_%H%M%S")
 files = []
 
+# Creates a log file.
+log = open("dbvrs_{}.log".format(today), "w+")
+
 start_process_time = 0
 
 # Variables that can be edited
@@ -27,11 +30,25 @@ def md5(fname):
             hash_md5.update(chunk)
     return hash_md5.hexdigest()
 
+def writeLog(message):
+    log.write("[{}]: {}\n".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S"), message))
+
+def disk_usage(path="/"):
+    total, used, free = shutil.disk_usage(path)
+
+    return { "total": total, "used": used, "free": free }
+
+    # print("Total: %d GiB" % (total // (2**30)))
+    # print("Used: %d GiB" % (used // (2**30)))
+    # print("Free: %d GiB" % (free // (2**30)))
 
 def backup(to_backup=False, store_backup=False):
+    start_process_time = time.process_time()
     global DIRECTORY_TO_BACKUP, DIRECTORY_TO_STORE_BACKUP
 
-    start_process_time = time.process_time()
+    archive_size = 0
+
+    writeLog("Backup started.")
 
     if(to_backup != False):
         DIRECTORY_TO_BACKUP = to_backup
@@ -40,29 +57,40 @@ def backup(to_backup=False, store_backup=False):
 
     # No directory selected for backup.
     if(DIRECTORY_TO_BACKUP == ''):
-        print("Error! No directory to backup!")
+        log.write("Error! No directory to backup! Exiting.")
         return 1001
     
     # No directory selected to store backup.
     if(DIRECTORY_TO_STORE_BACKUP == ''):
-        print("Error! No directory to store backup!")
+        log.write("Error! No directory to store backup! Exiting.")
         return 1002
 
-    print(DIRECTORY_TO_BACKUP)
-    print(DIRECTORY_TO_STORE_BACKUP)
-
+    # print(DIRECTORY_TO_BACKUP)
+    # print(DIRECTORY_TO_STORE_BACKUP)
 
     # Checks if backup location exists. If not, creates one.
     if not os.path.exists(DIRECTORY_TO_STORE_BACKUP):
         os.makedirs(DIRECTORY_TO_STORE_BACKUP)
-    
+
     # r=root, d=directories, f = files
     for r, d, f in os.walk(DIRECTORY_TO_BACKUP):
         for file in f:
             path = os.path.join(r, file)
-            files.append([path, md5(path)])
+            file_size = os.path.getsize(path)
+            archive_size += file_size
+            files.append([path, md5(path), file_size])
 
-    print("Time to finished generating hash value: {} seconds".format(time.process_time() - start_process_time))
+    writeLog("Time to finished generating hash value: {} seconds".format(time.process_time() - start_process_time))
+    writeLog("Total files' size: {} bytes".format(archive_size))
+
+    # Checks if backup location has enough space.
+    # In addition to the archive size, at least 1GB must be free.
+    current_disk = disk_usage()
+    if(current_disk["free"] - archive_size < 1073741824):
+        writeLog("Not enough free space on backup location!")
+        writeLog("\tReported free space: {} MB".format(((current_disk["free"] / 1024)/1024)))
+        writeLog("\tNeeded: {} MB".format(((archive_size / 1024)/1024)))
+        return -1
 
     # Create a metadata
     metadata = open(".ics", "w+")
@@ -76,15 +104,18 @@ def backup(to_backup=False, store_backup=False):
     # print("Files: " + str(files))
     # print("File count: " + str(len(files)))
 
+    # Gets process time for start time of storing.
+    start_storing_time = time.process_time()
+
     # Starts storing files to archive
     for file in files:
         file_process_time_start = time.process_time()
         filename = file[0]
         zipObj.write(filename)
         metadata.write('\n"{}",{}'.format(file[0], file[1]))
-        print("Time to finish storing '{}': {}s\n".format(filename, time.process_time() - file_process_time_start))
+        writeLog("Storing '{}' took {} seconds.".format(filename, time.process_time() - file_process_time_start))
     
-    print("Time to store backup: {} seconds".format(time.process_time() - start_process_time))
+    writeLog("The script took {} seconds to store the files.".format(time.process_time() - start_storing_time))
 
     metadata.close()
     zipObj.write('.ics')
@@ -93,8 +124,10 @@ def backup(to_backup=False, store_backup=False):
     # Remove metadata
     os.remove('.ics')
 
-    print("Time to finish: {} seconds".format(time.process_time() - start_process_time))
-    print("Backup completed.")
+    writeLog("The script took {} seconds to finish backing up.".format(time.process_time() - start_process_time))
+    writeLog("Backup completed!")
+
+    log.close()
     
     return 0
 
@@ -185,6 +218,7 @@ def restore(backupFile=False, restoreLocation=False):
     shutil.move(validationResults[1], restoreLocation)
 
 def main():
+    # disk_usage()
     # Backup
     backup(to_backup="C:/Capstone/files/test_case_1")
 
