@@ -5,15 +5,19 @@ import zipfile
 import fnmatch
 import string
 import tempfile
+import time
+import shutil
 
 # Gets current date and time upon backup execution.
 today = datetime.now().strftime("%Y-%m-%d_%H%M%S")
 files = []
 
+start_process_time = 0
+
 # Variables that can be edited
 # TODO: Prevent users from backing-up system files.
-DIRECTORY_TO_BACKUP = 'D:/Capstone/files'
-DIRECTORY_TO_STORE_BACKUP = 'D:/Capstone/backup/'
+DIRECTORY_TO_BACKUP = ''
+DIRECTORY_TO_STORE_BACKUP = 'D:/backup/'
 filetypes_to_include = ['*.prn']
 
 def md5(fname):
@@ -24,17 +28,41 @@ def md5(fname):
     return hash_md5.hexdigest()
 
 
-def backup(to_backup=False):
+def backup(to_backup=False, store_backup=False):
+    global DIRECTORY_TO_BACKUP, DIRECTORY_TO_STORE_BACKUP
+
+    start_process_time = time.process_time()
+
     if(to_backup != False):
         DIRECTORY_TO_BACKUP = to_backup
+    if(store_backup != False):
+        DIRECTORY_TO_STORE_BACKUP = store_backup
+
+    # No directory selected for backup.
+    if(DIRECTORY_TO_BACKUP == ''):
+        print("Error! No directory to backup!")
+        return 1001
+    
+    # No directory selected to store backup.
+    if(DIRECTORY_TO_STORE_BACKUP == ''):
+        print("Error! No directory to store backup!")
+        return 1002
 
     print(DIRECTORY_TO_BACKUP)
+    print(DIRECTORY_TO_STORE_BACKUP)
+
+
+    # Checks if backup location exists. If not, creates one.
+    if not os.path.exists(DIRECTORY_TO_STORE_BACKUP):
+        os.makedirs(DIRECTORY_TO_STORE_BACKUP)
     
     # r=root, d=directories, f = files
     for r, d, f in os.walk(DIRECTORY_TO_BACKUP):
         for file in f:
             path = os.path.join(r, file)
             files.append([path, md5(path)])
+
+    print("Time to finished generating hash value: {} seconds".format(time.process_time() - start_process_time))
 
     # Create a metadata
     metadata = open(".ics", "w+")
@@ -50,28 +78,35 @@ def backup(to_backup=False):
 
     # Starts storing files to archive
     for file in files:
+        file_process_time_start = time.process_time()
         filename = file[0]
         zipObj.write(filename)
         metadata.write('\n"{}",{}'.format(file[0], file[1]))
+        print("Time to finish storing '{}': {}s\n".format(filename, time.process_time() - file_process_time_start))
+    
+    print("Time to store backup: {} seconds".format(time.process_time() - start_process_time))
 
     metadata.close()
     zipObj.write('.ics')
     zipObj.close()
+    
+    # Remove metadata
+    os.remove('.ics')
 
-    # TODO: Delete .ics file
-
+    print("Time to finish: {} seconds".format(time.process_time() - start_process_time))
     print("Backup completed.")
     
     return 0
 
-def validate(mode=0):
-    if(mode == 1):
-        print("Mode 1 initiated.")
+def validate(mode=0, backupFile=False):
+    # Backup file not specified.
+    if (not backupFile):
+        print("Backup file not provided!")
         return 0
     
     # TODO: Arguements for validation
     # TODO: Check if provided file is NOT a backup archive.
-    zipObj = zipfile.ZipFile(''.join([DIRECTORY_TO_STORE_BACKUP, '2019-12-06_200319.zip']))
+    zipObj = zipfile.ZipFile(backupFile)
 
     # Creates a temporary directory for validation
     tempDir = tempfile.mkdtemp()
@@ -85,37 +120,81 @@ def validate(mode=0):
 
     validator = open(tempDir + '/.ics').readlines()
 
-    # print(validator)
+    totalFilesChecked = len(files)
+    totalFilesExpected = len(validator)
+    totalFilesMatched = 0
 
+    totalUnmatchedFiles = 0
+    totalMismatchedFiles = 0
     for cnt, file in enumerate(files):
-        # print("{}: {}".format(cnt, file[0]))
         # Skip metadata
         if(file[0] == ".ics"):
             continue
         else:
-            fileAuditName = validator[cnt].split(",")[0].replace("/", "\\").replace("\"", "").split(":\\")[1]
-            fileAuditChecksum = ''.join(e for e in validator[cnt].split(",")[1] if e.isalnum())
+            fileAuditName = validator[cnt - totalUnmatchedFiles].split(",")[0].replace("/", "\\").replace("\"", "").split(":\\")[1]
+            fileAuditChecksum = ''.join(e for e in validator[cnt - totalUnmatchedFiles].split(",")[1] if e.isalnum())
 
             if(file[0] == fileAuditName):
-                print("'{}' == '{}'".format(file[1], fileAuditChecksum))
                 if(file[1] == fileAuditChecksum):
-                    print("File: {}, Checksum matched!".format(file[0]))
+                    print("Checksum matched for file '{}'.".format(file[0]))
+                    totalFilesMatched += 1
+                else:
+                    print("Checksum failed to matched for file '{}'.".format(file[0]))
+                    totalMismatchedFiles += 1
             else:
-                print("File name didn't matched.")
+                # print("File name didn't matched.")
+                print("Expected: {}, got {}".format(fileAuditName, file[0]))
+                os.remove(file[0])
+                totalUnmatchedFiles += 1
+                # print("Got: {}".format(file[0]))
 
-    return 0
+    # Mode 1: Report success and returns temp directory.
+    if(mode == 1):
+        return [
+            [
+                totalFilesChecked,
+                totalFilesExpected,
+                totalFilesMatched,
+                totalUnmatchedFiles,
+                totalMismatchedFiles
+            ],
+            tempDir
+        ]
+    # Default mode: Validate only
+    # TODO: Dispose temp files
+    else:
+        print("Files in backup: {}".format(totalFilesChecked))
+        print("Expected: {}".format(totalFilesExpected))
+        print("Matched: {}".format(totalFilesMatched))
+        print("Unlisted: {}".format(totalUnmatchedFiles))
+        print("Checksum mismatch: {}".format(totalMismatchedFiles))
+        return 0
 
-def restore():
+def restore(backupFile=False, restoreLocation=False):
     # TODO: Validate the backup first!
-    validationStatus = validate(mode=1)
-    print("Validation status: {}".format(validationStatus))
+    if (not backupFile):
+        print("Backup file not provided!")
+        return 0
+    if (not restoreLocation):
+        print("Restore location not provided!")
+        return 0
 
+    # Validate first.
+    validationResults = validate(mode=1, backupFile=backupFile)
+
+    shutil.move(validationResults[1], restoreLocation)
 
 def main():
-    # backup(DIRECTORY_TO_BACKUP)
-    # validate()
-    restore()
+    # Backup
+    backup(to_backup="C:/Capstone/files/test_case_1")
+
+    # Validate
+    # validate(mode=0, backupFile="D:/backup/2020-01-06_125114.zip")
+
+    # Restore
+    # restore(backupFile="D:/backup/2020-01-06_125114.zip", restoreLocation="D:/restore/")
+
     # import ui_window
-    # Really am not hacking
+    # import ui
 
 main()
