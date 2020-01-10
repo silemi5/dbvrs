@@ -7,6 +7,7 @@ import string
 import tempfile
 import time
 import shutil
+import sys
 
 # Gets current date and time upon backup execution.
 today = datetime.now().strftime("%Y-%m-%d_%H%M%S")
@@ -14,6 +15,9 @@ files = []
 
 # Creates a log file.
 log = open("dbvrs_{}.log".format(today), "w+")
+
+# Print log?
+PRINT_LOG = False
 
 start_process_time = 0
 
@@ -31,7 +35,11 @@ def md5(fname):
     return hash_md5.hexdigest()
 
 def writeLog(message):
+    # log = open("dbvrs_{}.log".format(today), "w+")
     log.write("[{}]: {}\n".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S"), message))
+    if(PRINT_LOG):
+        print("[{}]: {}\n".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S"), message))
+    # log.close()
 
 def disk_usage(path="/"):
     total, used, free = shutil.disk_usage(path)
@@ -57,15 +65,19 @@ def backup(to_backup=False, store_backup=False):
 
     # No directory selected for backup.
     if(DIRECTORY_TO_BACKUP == ''):
-        log.write("Error! No directory to backup! Exiting.")
+        writeLog("Error! No directory to backup! Exiting.")
         return 1001
     
     # No directory selected to store backup.
     if(DIRECTORY_TO_STORE_BACKUP == ''):
-        log.write("Error! No directory to store backup! Exiting.")
+        writeLog("Error! No directory to store backup! Exiting.")
         return 1002
 
-    # print(DIRECTORY_TO_BACKUP)
+    # Missing slash at the end of directory
+    if(DIRECTORY_TO_BACKUP[-1:] != '/' or DIRECTORY_TO_BACKUP[-1:] != '\\'):
+        DIRECTORY_TO_BACKUP += "/"
+
+    print(DIRECTORY_TO_BACKUP[-1:])
     # print(DIRECTORY_TO_STORE_BACKUP)
 
     # Checks if backup location exists. If not, creates one.
@@ -126,24 +138,25 @@ def backup(to_backup=False, store_backup=False):
 
     writeLog("The script took {} seconds to finish backing up.".format(time.process_time() - start_process_time))
     writeLog("Backup completed!")
-
-    log.close()
     
     return 0
 
 def validate(mode=0, backupFile=False):
     # Backup file not specified.
     if (not backupFile):
-        print("Backup file not provided!")
+        writeLog("Backup file not provided!")
         return 0
     
     # TODO: Arguements for validation
     # TODO: Check if provided file is NOT a backup archive.
+    writeLog("Opening archive '{}'".format(backupFile))
     zipObj = zipfile.ZipFile(backupFile)
+
+    # TODO: Check free space for validation
 
     # Creates a temporary directory for validation
     tempDir = tempfile.mkdtemp()
-    print(tempDir)
+    writeLog("Temporary directory: {}".format(tempDir))
     zipObj.extractall(path=tempDir)
 
     for r, d, f in os.walk(tempDir):
@@ -153,10 +166,13 @@ def validate(mode=0, backupFile=False):
 
     validator = open(tempDir + '/.ics').readlines()
 
-    totalFilesChecked = len(files)
-    totalFilesExpected = len(validator)
-    totalFilesMatched = 0
+    # Files inside the archive, not including the metadata
+    totalFilesChecked = len(files) - 1
 
+    # Files listed in the .ics metadata, not including the first line of the metadata.
+    totalFilesExpected = len(validator) - 1
+
+    totalFilesMatched = 0
     totalUnmatchedFiles = 0
     totalMismatchedFiles = 0
     for cnt, file in enumerate(files):
@@ -175,7 +191,7 @@ def validate(mode=0, backupFile=False):
                     print("Checksum failed to matched for file '{}'.".format(file[0]))
                     totalMismatchedFiles += 1
             else:
-                # print("File name didn't matched.")
+                # Filename mismatch. Will not include in restoration.
                 print("Expected: {}, got {}".format(fileAuditName, file[0]))
                 os.remove(file[0])
                 totalUnmatchedFiles += 1
@@ -201,6 +217,7 @@ def validate(mode=0, backupFile=False):
         print("Matched: {}".format(totalFilesMatched))
         print("Unlisted: {}".format(totalUnmatchedFiles))
         print("Checksum mismatch: {}".format(totalMismatchedFiles))
+        shutil.rmtree(tempDir)
         return 0
 
 def restore(backupFile=False, restoreLocation=False):
@@ -215,15 +232,28 @@ def restore(backupFile=False, restoreLocation=False):
     # Validate first.
     validationResults = validate(mode=1, backupFile=backupFile)
 
+    # Moves the backup
     shutil.move(validationResults[1], restoreLocation)
 
 def main():
     # disk_usage()
+    global PRINT_LOG
+    PRINT_LOG = True
+
+    writeLog("Script executed, no UI.")
+
+    if(sys.argv[1] == "-bk"):
+        backup(sys.argv[2], sys.argv[3])
+    elif(sys.argv[1] == "-v"):
+        validate(mode=0, backupFile=sys.argv[2])
+    elif(sys.argv[1] == "-r"):
+        restore(sys.argv[2], sys.argv[3])
+
     # Backup
-    backup(to_backup="C:/Capstone/files/test_case_1")
+    # backup(to_backup="C:/Capstone/files/test_case_1")
 
     # Validate
-    # validate(mode=0, backupFile="D:/backup/2020-01-06_125114.zip")
+    # validate(mode=0, backupFile="D:/backup/2020-01-10_102535.zip")
 
     # Restore
     # restore(backupFile="D:/backup/2020-01-06_125114.zip", restoreLocation="D:/restore/")
@@ -231,4 +261,5 @@ def main():
     # import ui_window
     # import ui
 
-main()
+if __name__ == '__main__':
+    main()
