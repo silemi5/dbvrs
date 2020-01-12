@@ -249,9 +249,16 @@ def validate(mode=0, backupFile=False):
     writeLog("Matched: {}".format(totalFilesMatched))
     writeLog("Unlisted: {}".format(totalUnmatchedFiles))
     writeLog("Hash value mismatch: {}".format(totalMismatchedFiles))
-
-    global status
+    
+    global status, validationStats
     status = 0
+    validationStats = [
+        totalFilesChecked,
+        totalFilesExpected,
+        totalFilesMatched,
+        totalUnmatchedFiles,
+        totalMismatchedFiles
+    ]
 
     return 0
 

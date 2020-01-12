@@ -37,12 +37,14 @@ restoreLayout = [
 # create window
 window = sg.Window("Data backup, validation, and recovery system").Layout(welcomeLayout)
 
-# GUI Loop
+# Event loop
 while True:
     event, values = window.Read()
 
     if event is None or event == 'Exit':
         break
+    
+    # Backup module 
     if event == "Start":
         window.Hide()
         backupLocation = sg.PopupGetFolder('Please select a folder to store your backups.') + "/"
@@ -70,7 +72,8 @@ while True:
             sg.OneLineProgressMeter('Backup progress', total, total, '__backupProgress__',"Backup in progress...",orientation='h',)
             sg.PopupOK("Successfully backed up the specified folder!")
             window.UnHide()
-        
+    
+    # Validate module
     if event == "Validate a backup...":
         window.Hide()
         validateWindow = sg.Window("Validate a backup").Layout(validateLayout)
@@ -78,12 +81,16 @@ while True:
             validateEvent, validateValues = validateWindow.Read()
 
             if validateEvent is None or validateEvent == "Exit":
+                window.UnHide()
                 break
             if validateEvent == "Validate":
+                # Gets the file location of the archive.
                 validateArchive = validateValues[0]
 
+                # Creates a thread for validation
                 validateThread = threading.Thread(target=dbvrs.validate, args=(0, validateArchive))
                 validateThread.start()
+                validateWindow.Hide()
 
                 while validateThread.is_alive():
                     current = dbvrs.validateFileCount
@@ -102,13 +109,18 @@ while True:
                 else:
                     sg.OneLineProgressMeter('Validating backup', total, total, '__validateProgress__',"Validating backup in progress...",orientation='h',)
                     
-                    # TODO: Validation results
-                    sg.PopupOK("Successfully backed up the specified folder!")
+                    validationStatsOutput = "Validation results\n\nFiles in backup: {}\nExpected: {}\nMatched: {}\nUnlisted: {}\nHash value mismatched: {}".format(
+                        dbvrs.validationStats[0],
+                        dbvrs.validationStats[1],
+                        dbvrs.validationStats[2],
+                        dbvrs.validationStats[3],
+                        dbvrs.validationStats[4],
+                    )
+                    sg.PopupScrolled(validationStatsOutput, size=(50, 10))
                     window.UnHide()
-                
-                # sg.Popup(validateValues[0])
-                # break
-        break
+                    break
+    
+    # Restore module
     if event == "Restore from a backup...":
         window.Hide()
         restoreWindow = sg.Window("Restore from a backup").Layout(restoreLayout)
