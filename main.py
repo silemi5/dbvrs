@@ -14,7 +14,7 @@ today = datetime.now().strftime("%Y-%m-%d_%H%M%S")
 files = []
 
 # Creates a log file.
-log = open("dbvrs_{}.log".format(today), "w+")
+log = None
 
 # Print log?
 PRINT_LOG = False
@@ -26,6 +26,19 @@ start_process_time = 0
 DIRECTORY_TO_BACKUP = ''
 DIRECTORY_TO_STORE_BACKUP = 'D:/backup/'
 filetypes_to_include = ['*.prn']
+
+# Variables used to show progress in the GUI.
+backupFileCount = 0
+backupFilesTotal = 0
+backupMessageToShow = " "
+
+validateFileCount = 0
+validateFilesTotal = 0
+validationStats = []
+
+# Variable to report to the GUI if something's amiss.
+status = 0
+statusMessage = ""
 
 def md5(fname):
     hash_md5 = hashlib.md5()
@@ -51,8 +64,13 @@ def disk_usage(path="/"):
     # print("Free: %d GiB" % (free // (2**30)))
 
 def backup(to_backup=False, store_backup=False):
+    startLog()
+
     start_process_time = time.process_time()
-    global DIRECTORY_TO_BACKUP, DIRECTORY_TO_STORE_BACKUP
+    global DIRECTORY_TO_BACKUP, DIRECTORY_TO_STORE_BACKUP, backupMessageToShow, backupFilesTotal
+    global status, statusMessage
+
+    backupMessageToShow = "Backup started."
 
     archive_size = 0
 
@@ -66,27 +84,32 @@ def backup(to_backup=False, store_backup=False):
     # No directory selected for backup.
     if(DIRECTORY_TO_BACKUP == ''):
         writeLog("Error! No directory to backup! Exiting.")
+        status = 1001
         return 1001
     
     # No directory selected to store backup.
     if(DIRECTORY_TO_STORE_BACKUP == ''):
         writeLog("Error! No directory to store backup! Exiting.")
+        status = 1002
         return 1002
 
+    # print(DIRECTORY_TO_BACKUP[-1:])
     # Missing slash at the end of directory
-    if(DIRECTORY_TO_BACKUP[-1:] != '/' or DIRECTORY_TO_BACKUP[-1:] != '\\'):
-        DIRECTORY_TO_BACKUP += "/"
+    # if(DIRECTORY_TO_BACKUP[-1:] != '/' or DIRECTORY_TO_BACKUP[-1:] != '\\'):
+    #     DIRECTORY_TO_BACKUP += "/"
 
-    print(DIRECTORY_TO_BACKUP[-1:])
+    # print(DIRECTORY_TO_BACKUP[-1:])
     # print(DIRECTORY_TO_STORE_BACKUP)
 
     # Checks if backup location exists. If not, creates one.
     if not os.path.exists(DIRECTORY_TO_STORE_BACKUP):
         os.makedirs(DIRECTORY_TO_STORE_BACKUP)
 
+    backupMessageToShow = "Generating hash value of files."
     # r=root, d=directories, f = files
     for r, d, f in os.walk(DIRECTORY_TO_BACKUP):
         for file in f:
+            backupFilesTotal += 1
             path = os.path.join(r, file)
             file_size = os.path.getsize(path)
             archive_size += file_size
@@ -100,9 +123,11 @@ def backup(to_backup=False, store_backup=False):
     current_disk = disk_usage()
     if(current_disk["free"] - archive_size < 1073741824):
         writeLog("Not enough free space on backup location!")
-        writeLog("\tReported free space: {} MB".format(((current_disk["free"] / 1024)/1024)))
-        writeLog("\tNeeded: {} MB".format(((archive_size / 1024)/1024)))
-        return -1
+        writeLog("Reported free space: {} MB".format(((current_disk["free"] / 1024)/1024)))
+        writeLog("Needed: {} MB".format(((archive_size / 1024)/1024)))
+        status = 1003
+        statusMessage = "Not enough space on backup location!"
+        return 1003
 
     # Create a metadata
     metadata = open(".ics", "w+")
@@ -112,15 +137,13 @@ def backup(to_backup=False, store_backup=False):
     zipName = ''.join([DIRECTORY_TO_STORE_BACKUP, today, '.zip'])
     zipObj = zipfile.ZipFile(zipName, 'w', zipfile.ZIP_LZMA)
 
-    # TODO: Progress bar
-    # print("Files: " + str(files))
-    # print("File count: " + str(len(files)))
-
     # Gets process time for start time of storing.
     start_storing_time = time.process_time()
 
     # Starts storing files to archive
-    for file in files:
+    for index, file in enumerate(files):
+        global backupFileCount
+        backupFileCount = index
         file_process_time_start = time.process_time()
         filename = file[0]
         zipObj.write(filename)
@@ -142,6 +165,8 @@ def backup(to_backup=False, store_backup=False):
     return 0
 
 def validate(mode=0, backupFile=False):
+    startLog()
+
     # Backup file not specified.
     if (not backupFile):
         writeLog("Backup file not provided!")
@@ -172,6 +197,10 @@ def validate(mode=0, backupFile=False):
     # Files listed in the .ics metadata, not including the first line of the metadata.
     totalFilesExpected = len(validator) - 1
 
+    global validateFilesTotal, validateFileCount
+    validateFilesTotal = totalFilesExpected
+    validateFileCount = 0
+
     totalFilesMatched = 0
     totalUnmatchedFiles = 0
     totalMismatchedFiles = 0
@@ -185,14 +214,15 @@ def validate(mode=0, backupFile=False):
 
             if(file[0] == fileAuditName):
                 if(file[1] == fileAuditChecksum):
-                    print("Checksum matched for file '{}'.".format(file[0]))
+                    writeLog("Hash value matched for file '{}'.".format(file[0]))
                     totalFilesMatched += 1
                 else:
-                    print("Checksum failed to matched for file '{}'.".format(file[0]))
+                    writeLog("Hash value failed to matched for file '{}'.".format(file[0]))
                     totalMismatchedFiles += 1
+                validateFileCount += 1
             else:
                 # Filename mismatch. Will not include in restoration.
-                print("Expected: {}, got {}".format(fileAuditName, file[0]))
+                writeLog("Expected: {}, got {}".format(fileAuditName, file[0]))
                 os.remove(file[0])
                 totalUnmatchedFiles += 1
                 # print("Got: {}".format(file[0]))
@@ -212,15 +242,22 @@ def validate(mode=0, backupFile=False):
     # Default mode: Validate only
     # TODO: Dispose temp files
     else:
-        print("Files in backup: {}".format(totalFilesChecked))
-        print("Expected: {}".format(totalFilesExpected))
-        print("Matched: {}".format(totalFilesMatched))
-        print("Unlisted: {}".format(totalUnmatchedFiles))
-        print("Checksum mismatch: {}".format(totalMismatchedFiles))
         shutil.rmtree(tempDir)
-        return 0
+
+    writeLog("Files in backup: {}".format(totalFilesChecked))
+    writeLog("Expected: {}".format(totalFilesExpected))
+    writeLog("Matched: {}".format(totalFilesMatched))
+    writeLog("Unlisted: {}".format(totalUnmatchedFiles))
+    writeLog("Hash value mismatch: {}".format(totalMismatchedFiles))
+
+    global status
+    status = 0
+
+    return 0
 
 def restore(backupFile=False, restoreLocation=False):
+    startLog()
+
     # TODO: Validate the backup first!
     if (not backupFile):
         print("Backup file not provided!")
@@ -233,12 +270,18 @@ def restore(backupFile=False, restoreLocation=False):
     validationResults = validate(mode=1, backupFile=backupFile)
 
     # Moves the backup
-    shutil.move(validationResults[1], restoreLocation)
+    shutil.move(validationResults[1] + "/", restoreLocation)
+
+def startLog():
+    global log
+    log = open("dbvrs_{}.log".format(today), "w+")
 
 def main():
     # disk_usage()
-    global PRINT_LOG
+    global PRINT_LOG, log
     PRINT_LOG = True
+
+    log = open("dbvrs_{}.log".format(today), "w+")
 
     writeLog("Script executed, no UI.")
 
