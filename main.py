@@ -11,12 +11,14 @@ import sys
 
 # Gets current date and time upon backup execution.
 today = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+
+# Array of files
 files = []
 
 # Creates a log file.
 log = None
 
-# Print log?
+# Print log to console?
 PRINT_LOG = False
 
 start_process_time = 0
@@ -39,6 +41,15 @@ validationStats = []
 # Variable to report to the GUI if something's amiss.
 status = 0
 statusMessage = ""
+
+def resetVariables():
+    global backupFileCount, backupFilesTotal
+    global validateFileCount, validateFilesTotal
+
+    backupFileCount = 0
+    backupFilesTotal = 0
+    validateFileCount = 0
+    validateFilesTotal = 0
 
 def md5(fname):
     hash_md5 = hashlib.md5()
@@ -66,11 +77,11 @@ def disk_usage(path="/"):
 def backup(to_backup=False, store_backup=False):
     startLog()
 
-    start_process_time = time.process_time()
-    global DIRECTORY_TO_BACKUP, DIRECTORY_TO_STORE_BACKUP, backupMessageToShow, backupFilesTotal
-    global status, statusMessage
+    resetVariables()
 
-    backupMessageToShow = "Backup started."
+    start_process_time = time.process_time()
+    global DIRECTORY_TO_BACKUP, DIRECTORY_TO_STORE_BACKUP, backupFilesTotal
+    global status, statusMessage
 
     archive_size = 0
 
@@ -105,7 +116,6 @@ def backup(to_backup=False, store_backup=False):
     if not os.path.exists(DIRECTORY_TO_STORE_BACKUP):
         os.makedirs(DIRECTORY_TO_STORE_BACKUP)
 
-    backupMessageToShow = "Generating hash value of files."
     # r=root, d=directories, f = files
     for r, d, f in os.walk(DIRECTORY_TO_BACKUP):
         for file in f:
@@ -166,11 +176,15 @@ def backup(to_backup=False, store_backup=False):
 
 def validate(mode=0, backupFile=False):
     startLog()
+    
+    resetVariables()
+
+    writeLog("Started validation module")
 
     # Backup file not specified.
     if (not backupFile):
         writeLog("Backup file not provided!")
-        return 0
+        return 1000
     
     # TODO: Arguements for validation
     # TODO: Check if provided file is NOT a backup archive.
@@ -189,6 +203,8 @@ def validate(mode=0, backupFile=False):
             path = os.path.join(r, file)
             files.append([path.replace(tempDir + '\\', ""), md5(path)])
 
+    # Gets metadata of the archive
+    # TODO: Check if file is a valid backup archive
     validator = open(tempDir + '/.ics').readlines()
 
     # Files inside the archive, not including the metadata
@@ -237,11 +253,12 @@ def validate(mode=0, backupFile=False):
                 totalUnmatchedFiles,
                 totalMismatchedFiles
             ],
-            tempDir
+            tempDir,
+            True
         ]
     # Default mode: Validate only
-    # TODO: Dispose temp files
     else:
+        # Disposes temp files used in validation
         shutil.rmtree(tempDir)
 
     writeLog("Files in backup: {}".format(totalFilesChecked))
@@ -265,30 +282,39 @@ def validate(mode=0, backupFile=False):
 def restore(backupFile=False, restoreLocation=False):
     startLog()
 
+    resetVariables()
+    
+    writeLog("Started recover module.")
+
     # TODO: Validate the backup first!
     if (not backupFile):
         print("Backup file not provided!")
-        return 0
+        return 1000
     if (not restoreLocation):
         print("Restore location not provided!")
-        return 0
+        return 1000
+
+    writeLog("Validating backup archive.")
 
     # Validate first.
     validationResults = validate(mode=1, backupFile=backupFile)
 
-    # Moves the backup
-    shutil.move(validationResults[1] + "/", restoreLocation)
-
+    if(validationResults[2] is True):
+        tempDir = validationResults[1]
+        # Moves the backup
+        restoredFolder = shutil.move(tempDir + "/", restoreLocation)
+        # for i in os.listdir(tempDir):
+        #     shutil.move(os.path.join(tempDir, i), restoreLocation)
+    
 def startLog():
     global log
     log = open("dbvrs_{}.log".format(today), "w+")
 
 def main():
-    # disk_usage()
-    global PRINT_LOG, log
+    global PRINT_LOG
     PRINT_LOG = True
 
-    log = open("dbvrs_{}.log".format(today), "w+")
+    startLog()
 
     writeLog("Script executed, no UI.")
 
@@ -298,18 +324,6 @@ def main():
         validate(mode=0, backupFile=sys.argv[2])
     elif(sys.argv[1] == "-r"):
         restore(sys.argv[2], sys.argv[3])
-
-    # Backup
-    # backup(to_backup="C:/Capstone/files/test_case_1")
-
-    # Validate
-    # validate(mode=0, backupFile="D:/backup/2020-01-10_102535.zip")
-
-    # Restore
-    # restore(backupFile="D:/backup/2020-01-06_125114.zip", restoreLocation="D:/restore/")
-
-    # import ui_window
-    # import ui
 
 if __name__ == '__main__':
     main()

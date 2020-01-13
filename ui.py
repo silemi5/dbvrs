@@ -138,6 +138,30 @@ while True:
                 # TODO: Restore backup command
                 restoreThread = threading.Thread(target=dbvrs.restore, args=(backupFile, restoreLocation))
                 restoreThread.start()
+                
+                while restoreThread.is_alive():
+                    current = dbvrs.validateFileCount
+                    total = dbvrs.validateFilesTotal
+
+                    if(dbvrs.validateFileCount == 0):
+                        current = 0
+                    if(dbvrs.validateFilesTotal == 0):
+                        total = 1
+                    if(current == total):
+                        current -= 1
+                        sg.OneLineProgressMeter('Restoring backup', current, total, '__restoreProgress__',"Validation completed. Restoring.",orientation='h',)
+                    else:
+                        sg.OneLineProgressMeter('Restoring backup', current, total, '__restoreProgress__',"Validating backup in progress...",orientation='h',)
+                    
+                if(dbvrs.status != 0):
+                    sg.OneLineProgressMeterCancel("__restoreProgress__")
+                    messagebox.showerror(title="Error!", message=dbvrs.statusMessage)
+                else:
+                    sg.OneLineProgressMeter('Restoring backup', total, total, '__restoreProgress__',"Validating backup in progress...",orientation='h',)
+                    sg.Popup("Archive successfully restored!")
+                    window.UnHide()
+                    break
+
 # read window
 
 window.close()
