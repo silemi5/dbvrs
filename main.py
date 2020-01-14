@@ -9,9 +9,6 @@ import time
 import shutil
 import sys
 
-# Gets current date and time upon backup execution.
-today = datetime.now().strftime("%Y-%m-%d_%H%M%S")
-
 # Array of files
 files = []
 
@@ -32,7 +29,6 @@ filetypes_to_include = ['*.prn']
 # Variables used to show progress in the GUI.
 backupFileCount = 0
 backupFilesTotal = 0
-backupMessageToShow = " "
 
 validateFileCount = 0
 validateFilesTotal = 0
@@ -44,12 +40,19 @@ statusMessage = ""
 
 def resetVariables():
     global backupFileCount, backupFilesTotal
-    global validateFileCount, validateFilesTotal
+    global validateFileCount, validateFilesTotal, validationStats
+    global today, status, statusMessage
+    global start_process_time
+    global files
 
     backupFileCount = 0
     backupFilesTotal = 0
     validateFileCount = 0
     validateFilesTotal = 0
+    validationStats = []
+
+    start_process_time = 0
+    files = []
 
 def md5(fname):
     hash_md5 = hashlib.md5()
@@ -59,11 +62,23 @@ def md5(fname):
     return hash_md5.hexdigest()
 
 def writeLog(message):
+    global log
     # log = open("dbvrs_{}.log".format(today), "w+")
     log.write("[{}]: {}\n".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S"), message))
     if(PRINT_LOG):
         print("[{}]: {}\n".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S"), message))
     # log.close()
+
+def startLog():
+    global log, today
+
+    # Gets current date and time upon backup execution.
+    today = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+
+    log = open("dbvrs_{}.log".format(today), "w+")
+
+def endLog():
+    log.close()
 
 def disk_usage(path="/"):
     total, used, free = shutil.disk_usage(path)
@@ -75,9 +90,8 @@ def disk_usage(path="/"):
     # print("Free: %d GiB" % (free // (2**30)))
 
 def backup(to_backup=False, store_backup=False):
-    startLog()
-
     resetVariables()
+    startLog()
 
     start_process_time = time.process_time()
     global DIRECTORY_TO_BACKUP, DIRECTORY_TO_STORE_BACKUP, backupFilesTotal
@@ -146,6 +160,7 @@ def backup(to_backup=False, store_backup=False):
     # Creates a ZIP archive using LZMA compression
     zipName = ''.join([DIRECTORY_TO_STORE_BACKUP, today, '.zip'])
     zipObj = zipfile.ZipFile(zipName, 'w', zipfile.ZIP_LZMA)
+    writeLog("Saving backup to: {}".format(zipName))
 
     # Gets process time for start time of storing.
     start_storing_time = time.process_time()
@@ -171,14 +186,15 @@ def backup(to_backup=False, store_backup=False):
 
     writeLog("The script took {} seconds to finish backing up.".format(time.process_time() - start_process_time))
     writeLog("Backup completed!")
+
+    endLog()
     
     return 0
 
 def validate(mode=0, backupFile=False):
+    resetVariables()
     startLog()
     
-    resetVariables()
-
     writeLog("Started validation module")
 
     # Backup file not specified.
@@ -220,6 +236,7 @@ def validate(mode=0, backupFile=False):
     totalFilesMatched = 0
     totalUnmatchedFiles = 0
     totalMismatchedFiles = 0
+
     for cnt, file in enumerate(files):
         # Skip metadata
         if(file[0] == ".ics"):
@@ -277,13 +294,14 @@ def validate(mode=0, backupFile=False):
         totalMismatchedFiles
     ]
 
+    endLog()
+
     return 0
 
-def restore(backupFile=False, restoreLocation=False):
+def restore(backupFile=False, restoreLocation=False, ignore_mismatched_unlisted=False):
+    resetVariables()
     startLog()
 
-    resetVariables()
-    
     writeLog("Started recover module.")
 
     # TODO: Validate the backup first!
@@ -299,16 +317,18 @@ def restore(backupFile=False, restoreLocation=False):
     # Validate first.
     validationResults = validate(mode=1, backupFile=backupFile)
 
+    # print(validationResults[0])
+    global validationStats
+    validationStats = validationResults[0]
+
     if(validationResults[2] is True):
         tempDir = validationResults[1]
         # Moves the backup
-        restoredFolder = shutil.move(tempDir + "/", restoreLocation)
-        # for i in os.listdir(tempDir):
-        #     shutil.move(os.path.join(tempDir, i), restoreLocation)
-    
-def startLog():
-    global log
-    log = open("dbvrs_{}.log".format(today), "w+")
+        # restoredFolder = shutil.move(tempDir + "/", restoreLocation)
+        for i in os.listdir(tempDir):
+            shutil.move(os.path.join(tempDir, i), restoreLocation)
+
+    endLog()
 
 def main():
     global PRINT_LOG
