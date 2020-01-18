@@ -33,6 +33,8 @@ backupFilesTotal = 0
 validateFileCount = 0
 validateFilesTotal = 0
 validationStats = []
+filesMismatched = ""
+filesUnlisted = ""
 
 # Variable to report to the GUI if something's amiss.
 status = 0
@@ -40,7 +42,7 @@ statusMessage = ""
 
 def resetVariables():
     global backupFileCount, backupFilesTotal
-    global validateFileCount, validateFilesTotal, validationStats
+    global validateFileCount, validateFilesTotal, validationStats, filesMismatched, filesUnlisted
     global today, status, statusMessage
     global start_process_time
     global files
@@ -53,6 +55,9 @@ def resetVariables():
 
     start_process_time = 0
     files = []
+    filesMismatched = ""
+    filesUnlisted = ""
+
 
 def md5(fname):
     hash_md5 = hashlib.md5()
@@ -204,8 +209,16 @@ def validate(mode=0, backupFile=False):
     
     # TODO: Arguements for validation
     # TODO: Check if provided file is NOT a backup archive.
-    writeLog("Opening archive '{}'".format(backupFile))
-    zipObj = zipfile.ZipFile(backupFile)
+    zipObj = None
+    global statusMessage, status
+    try:
+        writeLog("Opening archive '{}'".format(backupFile))
+        zipObj = zipfile.ZipFile(backupFile)
+    except zipfile.BadZipFile:
+        writeLog("Not a valid archive! Exiting!")
+        statusMessage = "Not a valid archive!"
+        status = 1000
+        return [None,None,False]
 
     # TODO: Check free space for validation
 
@@ -221,7 +234,15 @@ def validate(mode=0, backupFile=False):
 
     # Gets metadata of the archive
     # TODO: Check if file is a valid backup archive
-    validator = open(tempDir + '/.ics').readlines()
+
+    validator = None
+    try:
+        validator = open(tempDir + '/.ics').readlines()
+    except FileNotFoundError:
+        statusMessage = "Not a valid backup archive! Exiting!"
+        writeLog(statusMessage)
+        status = 1000
+        return [None,None,False]
 
     # Files inside the archive, not including the metadata
     totalFilesChecked = len(files) - 1
@@ -229,7 +250,7 @@ def validate(mode=0, backupFile=False):
     # Files listed in the .ics metadata, not including the first line of the metadata.
     totalFilesExpected = len(validator) - 1
 
-    global validateFilesTotal, validateFileCount
+    global validateFilesTotal, validateFileCount, filesMismatched, filesUnlisted
     validateFilesTotal = totalFilesExpected
     validateFileCount = 0
 
@@ -243,20 +264,27 @@ def validate(mode=0, backupFile=False):
             continue
         else:
             fileAuditName = validator[cnt - totalUnmatchedFiles].split(",")[0].replace("/", "\\").replace("\"", "").split(":\\")[1]
-            fileAuditChecksum = ''.join(e for e in validator[cnt - totalUnmatchedFiles].split(",")[1] if e.isalnum())
+            fileAuditHashValue = ''.join(e for e in validator[cnt - totalUnmatchedFiles].split(",")[1] if e.isalnum())
 
             if(file[0] == fileAuditName):
-                if(file[1] == fileAuditChecksum):
+                if(file[1] == fileAuditHashValue):
                     writeLog("Hash value matched for file '{}'.".format(file[0]))
                     totalFilesMatched += 1
                 else:
                     writeLog("Hash value failed to matched for file '{}'.".format(file[0]))
+                    writeLog("Expected '{}', got '{}'".format(file[1], fileAuditHashValue))
+                    filesMismatched += "'{}'\n".format(file[0])
                     totalMismatchedFiles += 1
+                    
+                    # Mismatched hash value. Will not include in restoration.
+                    os.remove(tempDir + "\\" + file[0])
                 validateFileCount += 1
             else:
                 # Filename mismatch. Will not include in restoration.
                 writeLog("Expected: {}, got {}".format(fileAuditName, file[0]))
-                os.remove(file[0])
+                filesUnlisted += "'{}'\n".format(file[0])
+
+                os.remove(tempDir + "\\" + file[0])
                 totalUnmatchedFiles += 1
                 # print("Got: {}".format(file[0]))
 
@@ -268,7 +296,9 @@ def validate(mode=0, backupFile=False):
                 totalFilesExpected,
                 totalFilesMatched,
                 totalUnmatchedFiles,
-                totalMismatchedFiles
+                totalMismatchedFiles,
+                filesMismatched,
+                filesUnlisted
             ],
             tempDir,
             True
@@ -284,14 +314,16 @@ def validate(mode=0, backupFile=False):
     writeLog("Unlisted: {}".format(totalUnmatchedFiles))
     writeLog("Hash value mismatch: {}".format(totalMismatchedFiles))
     
-    global status, validationStats
+    global validationStats
     status = 0
     validationStats = [
         totalFilesChecked,
         totalFilesExpected,
         totalFilesMatched,
         totalUnmatchedFiles,
-        totalMismatchedFiles
+        totalMismatchedFiles,
+        filesMismatched,
+        filesUnlisted
     ]
 
     endLog()
@@ -316,6 +348,8 @@ def restore(backupFile=False, restoreLocation=False, ignore_mismatched_unlisted=
 
     # Validate first.
     validationResults = validate(mode=1, backupFile=backupFile)
+
+    # if validationResults == 
 
     # print(validationResults[0])
     global validationStats

@@ -10,7 +10,7 @@ sg.theme('TanBlue')
 # Menubar
 menuBar = [
     ['File', ['Validate a backup...', 'Restore from a backup...']],
-    ['About']
+    ['Help', ['About this program']]
 ]
 
 # layout
@@ -139,17 +139,22 @@ while True:
                     sg.OneLineProgressMeter('Validating backup', current, total, '__validateProgress__',"Validating backup in progress...",orientation='h',)
                 
                 if(dbvrs.status != 0):
+                    sg.OneLineProgressMeter('Validating backup', total, total, '__validateProgress__',"Validating backup in progress...",orientation='h',)
                     sg.OneLineProgressMeterCancel("__validateProcess__")
                     messagebox.showerror(title="Error!", message=dbvrs.statusMessage)
+                    window.UnHide()
+                    break
                 else:
                     sg.OneLineProgressMeter('Validating backup', total, total, '__validateProgress__',"Validating backup in progress...",orientation='h',)
                     
-                    validationStatsOutput = "Validation results\n\nFiles in backup: {}\nExpected: {}\nMatched: {}\nUnlisted: {}\nHash value mismatched: {}".format(
+                    validationStatsOutput = "Validation results\n\nFiles in backup: {}\nExpected: {}\nMatched: {}\nUnlisted: {}\nHash value mismatched: {}\n\nMismatched files:\n{}\n\nUnlisted files:\n{}\n\n".format(
                         dbvrs.validationStats[0],
                         dbvrs.validationStats[1],
                         dbvrs.validationStats[2],
                         dbvrs.validationStats[3],
                         dbvrs.validationStats[4],
+                        dbvrs.validationStats[5],
+                        dbvrs.validationStats[6]
                     )
                     sg.PopupScrolled(validationStatsOutput, size=(50, 10))
                     window.UnHide()
@@ -186,7 +191,6 @@ while True:
                 if (restoreLocation is None or restoreLocation == "Cancel" or restoreLocation == ""):
                     window.UnHide()
                     restoreWindow.close()
-                    break
                 
                 # TODO: Restore backup command
                 restoreThread = threading.Thread(target=dbvrs.restore, args=(backupFile, restoreLocation))
@@ -209,21 +213,31 @@ while True:
                 if(dbvrs.status != 0):
                     sg.OneLineProgressMeterCancel("__restoreProgress__")
                     messagebox.showerror(title="Error!", message=dbvrs.statusMessage)
+                    window.UnHide()
                 else:
                     sg.OneLineProgressMeter('Restoring backup', total, total, '__restoreProgress__',"Validating backup in progress...",orientation='h',)
 
-                    validationStatsOutput = "Restoration results\n\nFiles in backup: {}\nExpected: {}\nMatched: {}\nUnlisted: {}\nHash value mismatched: {}".format(
+                    validationStatsOutput = "Restoration results\n\nFiles in backup: {}\nExpected: {}\nMatched: {}\nUnlisted: {}\nHash value mismatched: {}\n\nNot restored files due to following:\nMismatched files:\n{}\n\nUnlisted files:\n{}\n\n".format(
                         dbvrs.validationStats[0],
                         dbvrs.validationStats[1],
                         dbvrs.validationStats[2],
                         dbvrs.validationStats[3],
                         dbvrs.validationStats[4],
+                        dbvrs.validationStats[5],
+                        dbvrs.validationStats[6],
                     )
-                    sg.PopupScrolled(validationStatsOutput, size=(50, 10))
+                    sg.PopupScrolled(validationStatsOutput, size=(70, 10))
                     sg.Popup("Archive successfully restored!")
                     window.UnHide()
                     break
 
+    # About screen
+    if event == "About this program":
+        aboutString = "Data backup, validation, and recovery system\n"
+        aboutString += "In Partial Fulfillment of the Requirements for the CSIT 141 Capstone Project\n\n"
+        aboutString += "Members:\nEmir Jo Jr.\nMoh. Alnaghil Teo\nSadik Mujaal"
+        aboutString += "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nThank you for the hard work!"
+        sg.PopupScrolled(aboutString, size=(50, 10), auto_close=True)
 # read window
 
 window.close()
