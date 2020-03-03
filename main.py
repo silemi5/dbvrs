@@ -8,6 +8,8 @@ import tempfile
 import time
 import shutil
 import sys
+import json
+from config import Config
 
 # Array of files
 files = []
@@ -58,7 +60,6 @@ def resetVariables():
     filesMismatched = ""
     filesUnlisted = ""
 
-
 def md5(fname):
     hash_md5 = hashlib.md5()
     with open(fname, "rb") as f:
@@ -94,7 +95,10 @@ def disk_usage(path="/"):
     # print("Used: %d GiB" % (used // (2**30)))
     # print("Free: %d GiB" % (free // (2**30)))
 
-def backup(to_backup=False, store_backup=False):
+def backup(to_backup=False, store_backup=False, mode=0):
+    # Modes:
+    #   Mode 0 - single folder backup
+    #   Mode 1 - multiple folder backup
     resetVariables()
     startLog()
 
@@ -131,18 +135,25 @@ def backup(to_backup=False, store_backup=False):
     # print(DIRECTORY_TO_BACKUP[-1:])
     # print(DIRECTORY_TO_STORE_BACKUP)
 
+    # Starts loop here
     # Checks if backup location exists. If not, creates one.
     if not os.path.exists(DIRECTORY_TO_STORE_BACKUP):
         os.makedirs(DIRECTORY_TO_STORE_BACKUP)
 
-    # r=root, d=directories, f = files
-    for r, d, f in os.walk(DIRECTORY_TO_BACKUP):
-        for file in f:
-            backupFilesTotal += 1
-            path = os.path.join(r, file)
-            file_size = os.path.getsize(path)
-            archive_size += file_size
-            files.append([path, md5(path), file_size])
+    # Transform single folder backup into array.
+    if(mode == 0):
+        DIRECTORY_TO_BACKUP = [ DIRECTORY_TO_BACKUP ]
+
+    for directory in DIRECTORY_TO_BACKUP:
+        # r=root, d=directories, f = files
+        for r, d, f in os.walk(directory):
+            for file in f:
+                backupFilesTotal += 1
+                path = os.path.join(r, file)
+                file_size = os.path.getsize(path)
+                archive_size += file_size
+                files.append([path, md5(path), file_size])
+        # Loop will end here
 
     writeLog("Time to finished generating hash value: {} seconds".format(time.process_time() - start_process_time))
     writeLog("Total files' size: {} bytes".format(archive_size))
@@ -364,6 +375,19 @@ def restore(backupFile=False, restoreLocation=False, ignore_mismatched_unlisted=
 
     endLog()
 
+def oneClickBackup(backup_location=None):
+    # Backup setting directory
+    dbvrs_config_path = os.environ['APPDATA'] + "\\DBVRS"
+
+    # Creates dbvrs config folder if not exists.
+    if not os.path.exists(dbvrs_config_path):
+        os.makedirs(dbvrs_config_path)
+
+    # Config file
+    config = Config(config_path=dbvrs_config_path, bk_loc=backup_location)
+
+    backup(config.getFoldersToBackup(), config.getBackupLocation(), mode=1)
+    
 def main():
     global PRINT_LOG
     PRINT_LOG = True
@@ -378,6 +402,17 @@ def main():
         validate(mode=0, backupFile=sys.argv[2])
     elif(sys.argv[1] == "-r"):
         restore(sys.argv[2], sys.argv[3])
+    # TEST COMMAND: Multiple folder
+    elif(sys.argv[1] == "-t1"):
+        DIRECTORIES_TO_BACKUP = ["E:\\Capstone\\files\\test_case_4", "E:\\Capstone\\files\\test_case_8"]
+        backup(DIRECTORIES_TO_BACKUP, "E:\\Capstone\\backup\\test", mode=1)
+    # TEST COMMAND: Single folder
+    elif(sys.argv[1] == "-t2"):
+        DIRECTORIES_TO_BACKUP = "E:\\Capstone\\files\\test_case_4"
+        backup(DIRECTORIES_TO_BACKUP, "E:\\Capstone\\backup\\test", mode=0)
+    # TEST COMMAND: One click
+    elif(sys.argv[1] == "-t3"):
+        oneClickBackup(backup_location="E:\\Capstone\\backup\\test")
 
 if __name__ == '__main__':
     main()

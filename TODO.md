@@ -1,4 +1,9 @@
 # TODO
+## Urgent
+- Multiple folders
+- One click backup
+- Scheduled backup (daily, weekly, monthly)
+
 ## General
 - Improve title
 - Improve manuscript based from the format and guidelines
@@ -18,7 +23,7 @@
 - Scheduled backup
 - Default data to backup
 - Selective backup
-- Consider the free space capacity of the storage device and the size of data to be backed-up
++ Consider the free space capacity of the storage device and the size of data to be backed-up
 - Organize the backup feature
     - Full, folder by folder, file by file
 
@@ -27,11 +32,18 @@
 
 ## Recovery
 - What are the files needed to be recovered
-- Limitations of size to recover and free space
++ Limitations of size to recover and free space
 
 ## Uncategorized
 - Check configurations for timing differences
 - Have/create suggestons for recommended steps for user to ensure prpoer backup
 - Further exlain of having to ensure data integrity
 - Improve the backup mechanism so that the user knows the logic of the backup
-- Try to include a verbose log
++ Try to include a verbose log
+
+
+
+mtp time
+
+system hard time
+

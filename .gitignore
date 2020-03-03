@@ -1,2 +1,6 @@
 .ics
 __pycache__
+*.log
+test
+build
+dist
