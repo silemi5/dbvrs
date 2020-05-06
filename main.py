@@ -388,6 +388,15 @@ def oneClickBackup(backup_location=None):
 
     backup(config.getFoldersToBackup(), config.getBackupLocation(), mode=1)
     
+def configUpdate(backup_location=False, folders_to_backup=[]):
+    # Backup setting directory
+    # dbvrs_config_path = os.environ['APPDATA'] + "\\DBVRS"
+
+    config = Config(bk_loc=backup_location)
+
+    config.updateConfiguration(backup_location, folders_to_backup)
+
+
 def main():
     global PRINT_LOG
     PRINT_LOG = True
@@ -413,6 +422,9 @@ def main():
     # TEST COMMAND: One click
     elif(sys.argv[1] == "-t3"):
         oneClickBackup(backup_location="E:\\Capstone\\backup\\test")
+    # TEST COMMAND: Update configuration
+    elif(sys.argv[1] == "-t4"):
+        configUpdate("E:\\Capstone\\backup\\test1", ["E:\\Capstone\\files\\test_case_8", "E:\\Capstone\\files\\test_case_4"])
 
 if __name__ == '__main__':
     main()
