@@ -3,6 +3,7 @@ from tkinter import messagebox
 import threading
 
 import main as dbvrs
+from config import Config
 
 # Theme
 sg.theme('TanBlue')
@@ -56,29 +57,54 @@ while True:
     if event == "Start":
         window.Hide()
 
+        # TODO: Check if config file exists then save it
+        config = Config()
+
         # Backup location
         backupLocation = ""
-        while backupLocation == "":
-            backupLocation = sg.PopupGetFolder('Please select a folder to store your backups.', 'Backup')
 
-        # Empty backup location or clicked cancel
-        if(backupLocation is None or not backupLocation):
-            window.UnHide()
-            continue
+        if config.NO_CONFIG == True:
+            while backupLocation == "":
+                backupLocation = sg.PopupGetFolder('Please select a folder to store your backups.', 'Backup')
 
-        # To backup location
-        toBackup = ""
-        while toBackup == "":
-            toBackup = sg.PopupGetFolder('Please select a folder to backup.', 'Backup')
+            # Empty backup location or clicked cancel
+            if(backupLocation is None or not backupLocation):
+                window.UnHide()
+                continue
 
-        # Empty to backup location or clicked cancel
-        if(toBackup is None or not toBackup):
-            window.UnHide()
-            continue
-        
+            # TODO: Multiple folders selection on UI.
+            # To backup location
+            toBackup = []
+            continueAddingFolders = True
+            while continueAddingFolders:
+                folderToBackup = sg.PopupGetFolder('Please select a folder to backup.', 'Backup')
+
+                # Empty to backup location or clicked cancel
+                if(folderToBackup is None or not folderToBackup):
+                    window.UnHide()
+                    break
+
+                toBackup.append(folderToBackup)
+                
+                promptContinueAddingFolders = sg.popup_yes_no('Do you want to add another folder?')
+
+                if promptContinueAddingFolders == "Yes":
+                    continueAddingFolders = True
+                else:
+                    continueAddingFolders = False
+
+            # Empty to backup location or clicked cancel
+            if(toBackup is None or not toBackup):
+                window.UnHide()
+                continue
+        else:
+            backupLocation = config.getBackupLocation()
+            toBackup = config.getFoldersToBackup()
+
         backupLocation += "/"
-        toBackup += "/"
-        backupThread = threading.Thread(target=dbvrs.backup, args=(toBackup, backupLocation,))
+        mode = 1
+        # toBackup += "/"
+        backupThread = threading.Thread(target=dbvrs.backup, args=(toBackup, backupLocation, mode))
         backupThread.start()
 
         while backupThread.is_alive():
@@ -99,7 +125,15 @@ while True:
         else:
             sg.OneLineProgressMeter('Backup progress', total, total, '__backupProgress__',"Backup in progress...",orientation='h',)
             sg.PopupOK("Successfully backed up the specified folder!")
+
+            if config.NO_CONFIG:
+                configAnswer = sg.popup_yes_no('Do you want to save this session?')
+                
+                if configAnswer == "Yes":
+                    config.updateConfiguration(backup_location=backupLocation, folders_to_backup=toBackup)
+                    
             window.UnHide()
+
     
     # Validate module
     if event == "Validate a backup...":

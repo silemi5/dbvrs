@@ -376,15 +376,7 @@ def restore(backupFile=False, restoreLocation=False, ignore_mismatched_unlisted=
     endLog()
 
 def oneClickBackup(backup_location=None):
-    # Backup setting directory
-    dbvrs_config_path = os.environ['APPDATA'] + "\\DBVRS"
-
-    # Creates dbvrs config folder if not exists.
-    if not os.path.exists(dbvrs_config_path):
-        os.makedirs(dbvrs_config_path)
-
-    # Config file
-    config = Config(config_path=dbvrs_config_path, bk_loc=backup_location)
+    config = Config(bk_loc=backup_location)
 
     backup(config.getFoldersToBackup(), config.getBackupLocation(), mode=1)
     
