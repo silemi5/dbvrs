@@ -10,7 +10,7 @@ sg.theme('TanBlue')
 
 # Menubar
 menuBar = [
-    ['File', ['Validate a backup...', 'Restore from a backup...', 'Configure']],
+    ['File', ['Validate a backup...', 'Restore from a backup...', 'Start/Stop scheduled backups', 'Configure']],
     ['Help', ['About this program']]
 ]
 
@@ -19,9 +19,10 @@ welcomeLayout = None
 validateLayout = None
 restoreLayout = None
 configLayout = None
+backgroundTray = None
 
 def initiateLayoutVariables():
-    global welcomeLayout, validateLayout, restoreLayout, configLayout
+    global welcomeLayout, validateLayout, restoreLayout, configLayout, backgroundTray
 
     welcomeLayout = [
         [ sg.Menu(menuBar)],
@@ -73,6 +74,8 @@ def initiateLayoutVariables():
         ],
         [sg.Submit(), sg.Cancel()]
     ]
+
+    backgroundTray = ['BLANK', ['!Scheduled backups is on', 'E&xit']]
 
 # create window
 initiateLayoutVariables()
@@ -166,7 +169,6 @@ while True:
                     
             window.UnHide()
 
-    
     # Validate module
     if event == "Validate a backup...":
         window.Hide()
@@ -391,6 +393,31 @@ while True:
                 #             continue
                 #         configWindow['-DAY-'].update(configValues['-DAY-'][:-1])
 
+    if event == 'Start/Stop scheduled backups':
+        initiateLayoutVariables()
+
+        config = dbvrs.getConfig()
+
+        if(config.NO_CONFIG):
+            sg.Popup("Please backup first by clicking 'Start' on the welcome screen.")
+        else:
+            print("Proceed")
+
+            tray = sg.SystemTray(menu=backgroundTray, data_base64=sg.DEFAULT_BASE64_ICON, )
+
+            scheduledBackupThread = threading.Thread(target=dbvrs.backgroundProcess, args=())
+            scheduledBackupThread.start()
+            
+            while True:
+                menu_item = tray.read()
+                if menu_item == 'Exit':
+                    scheduledBackupThread.do_run = False
+                    break
+                elif menu_item == 'Open':
+                    sg.SystemTray.notify('Notification Open', 'This is the notification message')
+                    sg.popup('Menu item chosen', menu_item)
+            
+            tray.Close()
 # read window
 
 window.close()

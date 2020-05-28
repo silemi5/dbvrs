@@ -361,9 +361,6 @@ def restore(backupFile=False, restoreLocation=False, ignore_mismatched_unlisted=
     # Validate first.
     validationResults = validate(mode=1, backupFile=backupFile)
 
-    # if validationResults == 
-
-    # print(validationResults[0])
     global validationStats
     validationStats = validationResults[0]
 
@@ -394,7 +391,8 @@ def getConfig():
     return config
 
 def backgroundProcess():
-    while True:
+    t = threading.currentThread()
+    while getattr(t, "do_run", True):
         # Get day and time from config
         config = Config()
 
@@ -408,114 +406,76 @@ def backgroundProcess():
 
         lastBackupTime = config.getLastBackup()
 
-        # Last backup was less than a day ago, abort the background process
+        # Last backup was less than a day ago, gonna sleep.
         if((today.timestamp() - lastBackupTime) < 86000):
-            print("Backup was recent!")
-            # time.sleep(60*60)
-            time.sleep(10)
+            time.sleep(60)
         else:
             if(scheduledBackupMode == 0):
-                # Daily
-                print("Daily backup")
+                # Daily scheduled backup
                 
                 # Compare if it is backup time
                 if today < compareToday:
                     # not yet, sleep for this time
-                    print("Not yet")
-                    nowScheduledDelta = compareToday - today
-
-                    timeToSleepDelimit = nowScheduledDelta.__str__().split(":")
-
-                    timeToSleep = int(timeToSleepDelimit[0])*60*60 + int(timeToSleepDelimit[1])*60
-                    print("Sleeping for",timeToSleep.__str__())
-                    time.sleep(timeToSleep)
+                    time.sleep(60)
                 elif today > compareToday:
-                    # It has passed
-                    print("Backup time!!!")
-                    
                     # Execute backup
-                    # backup backup code here
+                    oneClickBackup()
 
-                    # Sleep for a specified time depending on schedule
-                    print("Sleeping for 20 seconds for testing...")
-                    time.sleep(20)
-                    # time.sleep(86000 * 7)
-                    # sys.exit()
                     config.updateLastBackup(timestamp=today.timestamp())
+
+                    # Sleep for 60 seconds.
+                    time.sleep(60)
             elif(scheduledBackupMode == 1):
-                # Weekly
+                # Weekly scheduled backup
+
                 # Compare if today is backup day
                 if today.weekday() == scheduledDay:
                     # Compare if it is backup time
                     if today < compareToday:
                         # not yet, sleep for this time
-                        print("Not yet")
-                        nowScheduledDelta = compareToday - today
-
-                        timeToSleepDelimit = nowScheduledDelta.__str__().split(":")
-
-                        timeToSleep = int(timeToSleepDelimit[0])*60*60 + int(timeToSleepDelimit[1])*60
-                        print("Sleeping for",timeToSleep.__str__())
-                        time.sleep(timeToSleep)
+                        time.sleep(60)
                     elif today > compareToday:
-                        # It has passed
-                        print("Backup time!!!")
-                        
                         # Execute backup
-                        # backup backup code here
+                        oneClickBackup()
 
-                        # Sleep for a specified time depending on schedule
-                        print("Sleeping for 20 seconds for testing...")
-                        time.sleep(20)
-                        # time.sleep(86000 * 7)
-                        # sys.exit()
                         config.updateLastBackup(timestamp=today.timestamp())
 
+                        # Sleep for 60 seconds.
+                        time.sleep(60)
+
                 else:
-                    print("Different day, try again in a hour")
-                    # time.sleep(60*60)
-                    time.sleep(20)
+                    # Not backup day, gonna try in a minute.
+                    time.sleep(60)
             elif(scheduledBackupMode == 2):
-                print("Monthly backup")
+                # Monthly scheduled backup
                 scheduledDay = config.getBackupDay()
                 scheduledMonth = config.getNextBackupMonth()
 
+                # Compared if it is the backup month.
                 if today.month == scheduledMonth:
+                    # Compare if it is backup day.
                     if today.day == scheduledDay:
                         # Compare if it is backup time
                         if today < compareToday:
-                            # not yet, sleep for this time
-                            print("Not yet")
-                            nowScheduledDelta = compareToday - today
-
-                            timeToSleepDelimit = nowScheduledDelta.__str__().split(":")
-
-                            timeToSleep = int(timeToSleepDelimit[0])*60*60 + int(timeToSleepDelimit[1])*60
-                            print("Sleeping for",timeToSleep.__str__())
-                            time.sleep(timeToSleep)
+                            time.sleep(60)
                         elif today > compareToday:
-                            # It has passed
-                            print("Backup time!!!")
-                            
                             # Execute backup
-                            # backup backup code here
+                            oneClickBackup()
 
                             # Sleep for a specified time depending on schedule
-                            print("Sleeping for 20 seconds for testing...")
-                            time.sleep(20)
-                            # time.sleep(86000 * 7)
-                            # sys.exit()
                             config.updateLastBackup(timestamp=today.timestamp())
+                            time.sleep(60)
 
                     else:
-                        print("Different day, try again in a hour")
-                        time.sleep(60*60)
+                        # Different day, try again in a minute
+                        time.sleep(60)
                 else:
-                    print("Different month, try again in a day to check")
-                    # time.sleep(86000)
-                    time.sleep(30)
-                # config.updateLastBackup(timestamp=today.timestamp())
-
+                    # Different month, try again in a minute
+                    time.sleep(60)
+            elif(scheduledBackupMode == 3):
+                # Scheduled backups are off, so the thread will terminate.
+                break
+    print("Stopping thread.")
 def main():
     global PRINT_LOG
     PRINT_LOG = True
