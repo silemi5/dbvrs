@@ -389,6 +389,10 @@ def configUpdate(backup_location=False, folders_to_backup=[]):
 
     config.updateConfiguration(backup_location, folders_to_backup)
 
+def getConfig():
+    config = Config()
+    return config
+
 def backgroundProcess():
     while True:
         # Get day and time from config

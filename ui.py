@@ -10,7 +10,7 @@ sg.theme('TanBlue')
 
 # Menubar
 menuBar = [
-    ['File', ['Validate a backup...', 'Restore from a backup...']],
+    ['File', ['Validate a backup...', 'Restore from a backup...', 'Configure']],
     ['Help', ['About this program']]
 ]
 
@@ -18,9 +18,10 @@ menuBar = [
 welcomeLayout = None
 validateLayout = None
 restoreLayout = None
+configLayout = None
 
 def initiateLayoutVariables():
-    global welcomeLayout, validateLayout, restoreLayout
+    global welcomeLayout, validateLayout, restoreLayout, configLayout
 
     welcomeLayout = [
         [ sg.Menu(menuBar)],
@@ -40,6 +41,37 @@ def initiateLayoutVariables():
         [ sg.Text("Please select a backup file to restore.") ],
         [ sg.Input(), sg.FileBrowse(file_types=(("DBVRS generated archive", "*.zip"),)) ],
         [ sg.Button("Next"), sg.Cancel() ],
+    ]
+
+    configLayout = [
+        [sg.Text('Configuration', font=('Helvetica', 16), justification='left')],      
+        [sg.Text('Scheduled backups', font=('Helvetica', 13), justification='left')],      
+        [
+            sg.Radio('Daily', key='-sbDaily-', group_id='scheduledBackup-', size=(12, 1)), sg.Radio('Weekly', key='-sbWeekly-', group_id='scheduledBackup-', size=(12, 1))
+        ],          
+        [
+            sg.Radio('Monthly', key='-sbMonthly-', group_id='scheduledBackup-', size=(12, 1)), sg.Radio('Off', key='-sbOff-', group_id='scheduledBackup-', size=(12, 1))
+        ],      
+        [sg.Text('_'  * 100, size=(20, 1))],
+        [sg.Text('Schedule', font=('Helvetica', 13), justification='left')],      
+        [sg.Text('Scheduled backup time:'), sg.Input(key='-TIME-')],
+        [
+            sg.Text('Scheduled backup weekday:'),
+            sg.Combo([
+                'Sunday',
+                'Monday',
+                'Tuesday',
+                'Wednesday',
+                'Thursday',
+                'Friday',
+                'Saturday',
+            ], size=(13,1), key='-WEEKDAY-', default_value='')
+        ],
+        [
+            sg.Text('Scheduled backup monthly:'),
+            sg.Input(key='-DAY-', size=(13,1), enable_events=True)
+        ],
+        [sg.Submit(), sg.Cancel()]
     ]
 
 # create window
@@ -272,6 +304,93 @@ while True:
         aboutString += "Members:\nEmir Jo Jr.\nMoh. Alnaghil Teo\nSadik Mujaal"
         aboutString += "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nThank you for the hard work!"
         sg.PopupScrolled(aboutString, size=(50, 10), auto_close=True)
+
+    # Configure screen
+    if event == "Configure":
+        window.Hide()
+
+        config = dbvrs.getConfig()
+
+        if(config.NO_CONFIG):
+            sg.Popup("Please backup first by clicking 'Start' on the welcome screen.")
+            window.UnHide()
+        else:
+            scheduled_backup_mode = config.getScheduledBackupMode()
+            scheduled_backup_time = config.getScheduledTime()
+            scheduled_backup_weekday = config.getScheduledWeekDay()
+            scheduled_backup_day = config.getBackupDay()
+
+            # print(config.getBackupLocation())
+
+            initiateLayoutVariables()
+            configWindow = sg.Window('DBVRS Configuration', layout=configLayout, finalize=True)#.Layout(configLayout)
+
+            configWindow['-WEEKDAY-'].update('Friday')
+
+            if scheduled_backup_mode == 0:
+                configWindow['-sbDaily-'].update(True)
+            elif scheduled_backup_mode == 1:
+                configWindow['-sbWeekly-'].update(True)
+            elif scheduled_backup_mode == 2:
+                configWindow['-sbMonthly-'].update(True)
+            elif scheduled_backup_mode == 3:
+                configWindow['-sbOff-'].update(True)
+
+            configWindow['-TIME-'].update(scheduled_backup_time)
+            configWindow['-DAY-'].update(scheduled_backup_day)
+
+
+            while True:
+                configEvent, configValues = configWindow.read()
+
+                if configEvent is None or configEvent == 'Exit' or configEvent == 'Cancel':
+                    window.UnHide()
+                    configWindow.close()
+                    break
+
+                if configEvent == 'Submit':
+                    
+                    if configValues['-sbDaily-'] is True:
+                        config.setScheduledBackupMode(0)
+                    elif configValues['-sbWeekly-'] is True :
+                        config.setScheduledBackupMode(1)
+                    elif configValues['-sbMonthly-'] is True :
+                        config.setScheduledBackupMode(2)
+                    elif configValues['-sbOff-'] is True :
+                        config.setScheduledBackupMode(3)
+
+                    if configValues['-WEEKDAY-'] == 'Sunday':
+                        config.setScheduledWeekDay(0)
+                    elif configValues['-WEEKDAY-'] == 'Monday':
+                        config.setScheduledWeekDay(1)
+                    elif configValues['-WEEKDAY-'] == 'Tuesday':
+                        config.setScheduledWeekDay(2)
+                    elif configValues['-WEEKDAY-'] == 'Wednesday':
+                        config.setScheduledWeekDay(3)
+                    elif configValues['-WEEKDAY-'] == 'Thursday':
+                        config.setScheduledWeekDay(4)
+                    elif configValues['-WEEKDAY-'] == 'Friday':
+                        config.setScheduledWeekDay(5)
+                    elif configValues['-WEEKDAY-'] == 'Saturday':
+                        config.setScheduledWeekDay(6)
+
+                    config.setBackupDay(configValues['-DAY-'])
+                    config.setScheduledTime(configValues['-TIME-'])
+                    config.saveChanges()
+
+                    window.UnHide()
+                    configWindow.close()
+                    # print(config)
+                
+                # TODO: Validation of dates
+                # if configEvent == '-DAY-' and configValues['-DAY-']:
+                #     try:
+                #         input_as_int = int(configValues['-IN-'])
+                #     except:
+                #         if len(configValues['-DAY-']) == 1 and configValues['-DAY-'][0] == '-':
+                #             continue
+                #         configWindow['-DAY-'].update(configValues['-DAY-'][:-1])
+
 # read window
 
 window.close()

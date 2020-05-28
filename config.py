@@ -65,17 +65,19 @@ class Config:
         # Configuration not found
         if not os.path.exists(config_path + "\\dbvrs.json"):
             self.NO_CONFIG = True
-            # with open(config_path + "\\dbvrs.json", "w") as json_file:
-            #     json.dump(self.getDefaultConfiguration(bk_loc), json_file)
         
         return self.NO_CONFIG
 
-    def getDefaultConfiguration(self, backup_location):
+    def getDefaultConfiguration(self, backup_location=None):
         return {
             "backup_location":backup_location,
             "folders_to_backup":[],
-            "scheduled_backup_time": "",
-            "scheduled_backup_day": ""
+            "scheduled_backup_mode": 3,
+            "scheduled_backup_time": "12:00",
+            "scheduled_backup_weekday": 1,
+            "scheduled_backup_day": 1,
+            "next_scheduled_backup_month": 1,
+            "last_backup": 0
         }
 
     def updateConfiguration(self, backup_location=False, folders_to_backup=False):
@@ -101,6 +103,24 @@ class Config:
         # Folders to backup. Must be array.
         if(folders_to_backup != False):
             self.config['folders_to_backup'] = folders_to_backup
+
+        with open(config_path + "\\dbvrs.json", "w") as json_file:
+                json.dump(self.config, json_file)
+
+    def setScheduledBackupMode(self, mode=3):
+        self.config['scheduled_backup_mode'] = int(mode)
+
+    def setBackupDay(self, day=1):
+        self.config['scheduled_backup_day'] = int(day)
+
+    def setScheduledWeekDay(self, weekday=1):
+        self.config['scheduled_backup_weekday'] = int(weekday)
+
+    def setScheduledTime(self, time="12:00"):
+        self.config['scheduled_backup_time'] = time
+
+    def saveChanges(self):
+        config_path = os.environ['APPDATA'] + "\\DBVRS"
 
         with open(config_path + "\\dbvrs.json", "w") as json_file:
                 json.dump(self.config, json_file)
