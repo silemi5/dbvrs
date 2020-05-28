@@ -24,6 +24,36 @@ class Config:
     def getFoldersToBackup(self):
         return self.config['folders_to_backup']
 
+    def getScheduledTime(self):
+        return self.config['scheduled_backup_time']
+
+    def getScheduledWeekDay(self):
+        return self.config['scheduled_backup_weekday']
+
+    def getScheduledBackupMode(self):
+        return self.config['scheduled_backup_mode']
+
+    def getLastBackup(self):
+        return self.config['last_backup']
+    
+    def getBackupDay(self):
+        return self.config['scheduled_backup_day']
+
+    def getNextBackupMonth(self):
+        return self.config['next_scheduled_backup_month']
+
+    def updateLastBackup(self, timestamp):
+        config_path = os.environ['APPDATA'] + "\\DBVRS"
+
+        config_file = open(config_path + "\\dbvrs.json")
+        
+        self.config = json.load(config_file)
+
+        self.config['last_backup'] = timestamp
+
+        with open(config_path + "\\dbvrs.json", "w") as json_file:
+            json.dump(self.config, json_file)
+
     def checkConfigurationIfExists(self):
         config_path = os.environ['APPDATA'] + "\\DBVRS"
 
@@ -43,7 +73,9 @@ class Config:
     def getDefaultConfiguration(self, backup_location):
         return {
             "backup_location":backup_location,
-            "folders_to_backup":[]
+            "folders_to_backup":[],
+            "scheduled_backup_time": "",
+            "scheduled_backup_day": ""
         }
 
     def updateConfiguration(self, backup_location=False, folders_to_backup=False):

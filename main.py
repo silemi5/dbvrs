@@ -9,6 +9,7 @@ import time
 import shutil
 import sys
 import json
+import threading
 from config import Config
 
 # Array of files
@@ -388,6 +389,128 @@ def configUpdate(backup_location=False, folders_to_backup=[]):
 
     config.updateConfiguration(backup_location, folders_to_backup)
 
+def backgroundProcess():
+    while True:
+        # Get day and time from config
+        config = Config()
+
+        # Calculate date time from config
+        scheduledBackupMode = config.getScheduledBackupMode()
+        scheduledTime = config.getScheduledTime()
+        today = datetime.now()
+        scheduledDay = config.getScheduledWeekDay()
+        scheduledTimeDelimit = scheduledTime.split(":")
+        compareToday = today.replace(hour=int(scheduledTimeDelimit[0]), minute=int(scheduledTimeDelimit[1]))
+
+        lastBackupTime = config.getLastBackup()
+
+        # Last backup was less than a day ago, abort the background process
+        if((today.timestamp() - lastBackupTime) < 86000):
+            print("Backup was recent!")
+            # time.sleep(60*60)
+            time.sleep(10)
+        else:
+            if(scheduledBackupMode == 0):
+                # Daily
+                print("Daily backup")
+                
+                # Compare if it is backup time
+                if today < compareToday:
+                    # not yet, sleep for this time
+                    print("Not yet")
+                    nowScheduledDelta = compareToday - today
+
+                    timeToSleepDelimit = nowScheduledDelta.__str__().split(":")
+
+                    timeToSleep = int(timeToSleepDelimit[0])*60*60 + int(timeToSleepDelimit[1])*60
+                    print("Sleeping for",timeToSleep.__str__())
+                    time.sleep(timeToSleep)
+                elif today > compareToday:
+                    # It has passed
+                    print("Backup time!!!")
+                    
+                    # Execute backup
+                    # backup backup code here
+
+                    # Sleep for a specified time depending on schedule
+                    print("Sleeping for 20 seconds for testing...")
+                    time.sleep(20)
+                    # time.sleep(86000 * 7)
+                    # sys.exit()
+                    config.updateLastBackup(timestamp=today.timestamp())
+            elif(scheduledBackupMode == 1):
+                # Weekly
+                # Compare if today is backup day
+                if today.weekday() == scheduledDay:
+                    # Compare if it is backup time
+                    if today < compareToday:
+                        # not yet, sleep for this time
+                        print("Not yet")
+                        nowScheduledDelta = compareToday - today
+
+                        timeToSleepDelimit = nowScheduledDelta.__str__().split(":")
+
+                        timeToSleep = int(timeToSleepDelimit[0])*60*60 + int(timeToSleepDelimit[1])*60
+                        print("Sleeping for",timeToSleep.__str__())
+                        time.sleep(timeToSleep)
+                    elif today > compareToday:
+                        # It has passed
+                        print("Backup time!!!")
+                        
+                        # Execute backup
+                        # backup backup code here
+
+                        # Sleep for a specified time depending on schedule
+                        print("Sleeping for 20 seconds for testing...")
+                        time.sleep(20)
+                        # time.sleep(86000 * 7)
+                        # sys.exit()
+                        config.updateLastBackup(timestamp=today.timestamp())
+
+                else:
+                    print("Different day, try again in a hour")
+                    # time.sleep(60*60)
+                    time.sleep(20)
+            elif(scheduledBackupMode == 2):
+                print("Monthly backup")
+                scheduledDay = config.getBackupDay()
+                scheduledMonth = config.getNextBackupMonth()
+
+                if today.month == scheduledMonth:
+                    if today.day == scheduledDay:
+                        # Compare if it is backup time
+                        if today < compareToday:
+                            # not yet, sleep for this time
+                            print("Not yet")
+                            nowScheduledDelta = compareToday - today
+
+                            timeToSleepDelimit = nowScheduledDelta.__str__().split(":")
+
+                            timeToSleep = int(timeToSleepDelimit[0])*60*60 + int(timeToSleepDelimit[1])*60
+                            print("Sleeping for",timeToSleep.__str__())
+                            time.sleep(timeToSleep)
+                        elif today > compareToday:
+                            # It has passed
+                            print("Backup time!!!")
+                            
+                            # Execute backup
+                            # backup backup code here
+
+                            # Sleep for a specified time depending on schedule
+                            print("Sleeping for 20 seconds for testing...")
+                            time.sleep(20)
+                            # time.sleep(86000 * 7)
+                            # sys.exit()
+                            config.updateLastBackup(timestamp=today.timestamp())
+
+                    else:
+                        print("Different day, try again in a hour")
+                        time.sleep(60*60)
+                else:
+                    print("Different month, try again in a day to check")
+                    # time.sleep(86000)
+                    time.sleep(30)
+                # config.updateLastBackup(timestamp=today.timestamp())
 
 def main():
     global PRINT_LOG
@@ -417,6 +540,11 @@ def main():
     # TEST COMMAND: Update configuration
     elif(sys.argv[1] == "-t4"):
         configUpdate("E:\\Capstone\\backup\\test1", ["E:\\Capstone\\files\\test_case_8", "E:\\Capstone\\files\\test_case_4"])
+    # TEST COMMAND: Background process
+    elif(sys.argv[1] == "-t5"):
+        thread = threading.Thread(target=backgroundProcess, args=())
+        # thread.daemon = True
+        thread.start()
 
 if __name__ == '__main__':
     main()
