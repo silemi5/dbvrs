@@ -322,12 +322,23 @@ while True:
             scheduled_backup_weekday = config.getScheduledWeekDay()
             scheduled_backup_day = config.getBackupDay()
 
-            # print(config.getBackupLocation())
-
             initiateLayoutVariables()
-            configWindow = sg.Window('DBVRS Configuration', layout=configLayout, finalize=True)#.Layout(configLayout)
+            configWindow = sg.Window('DBVRS Configuration', layout=configLayout, finalize=True)
 
-            configWindow['-WEEKDAY-'].update('Friday')
+            if scheduled_backup_weekday == 0:
+                configWindow['-WEEKDAY-'].update('Sunday')
+            elif scheduled_backup_weekday == 1:
+                configWindow['-WEEKDAY-'].update('Monday')
+            elif scheduled_backup_weekday == 2:
+                configWindow['-WEEKDAY-'].update('Tuesday')
+            elif scheduled_backup_weekday == 3:
+                configWindow['-WEEKDAY-'].update('Wednesday')
+            elif scheduled_backup_weekday == 4:
+                configWindow['-WEEKDAY-'].update('Thursday')
+            elif scheduled_backup_weekday == 5:
+                configWindow['-WEEKDAY-'].update('Friday')
+            elif scheduled_backup_weekday == 6:
+                configWindow['-WEEKDAY-'].update('Saturday')
 
             if scheduled_backup_mode == 0:
                 configWindow['-sbDaily-'].update(True)
@@ -382,16 +393,6 @@ while True:
 
                     window.UnHide()
                     configWindow.close()
-                    # print(config)
-                
-                # TODO: Validation of dates
-                # if configEvent == '-DAY-' and configValues['-DAY-']:
-                #     try:
-                #         input_as_int = int(configValues['-IN-'])
-                #     except:
-                #         if len(configValues['-DAY-']) == 1 and configValues['-DAY-'][0] == '-':
-                #             continue
-                #         configWindow['-DAY-'].update(configValues['-DAY-'][:-1])
 
     if event == 'Start/Stop scheduled backups':
         initiateLayoutVariables()
